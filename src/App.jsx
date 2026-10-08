@@ -10,7 +10,7 @@ import ArtworkReview from './pages/ArtworkReview'
 import ArtworkApproval from './pages/ArtworkApproval'
 import MasterData from './pages/MasterData'
 import UsersRoles from './pages/UsersRoles'
-import ComingSoon from './pages/ComingSoon'
+import CountryRequirements from './pages/CountryRequirements'
 
 function Protected() {
   const { session, loading } = useAuth()
@@ -35,7 +35,7 @@ export default function App() {
         <Route path="/artworks/:id/approval" element={<ArtworkApproval />} />
         <Route path="/master/:kind" element={<MasterData />} />
         <Route path="/admin/users" element={<UsersRoles />} />
-        <Route path="/module/:name" element={<ComingSoon />} />
+        <Route path="/module/country-requirements" element={<CountryRequirements />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
