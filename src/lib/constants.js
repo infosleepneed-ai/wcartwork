@@ -21,7 +21,7 @@ export const ROLE_TEAM = {
   export: 'Export Team', qa: 'QA Team', admin: 'Admin'
 }
 export const ROLES = Object.keys(ROLE_LABEL)
-export const ARTWORK_TYPES = ['Carton', 'Label', 'Leaflet', 'Blister foil', 'Insert', 'Tube', 'Shipper']
+export const ARTWORK_TYPES = ['Carton', 'Foil', 'Label', 'Insert', 'Shipper', 'Outer Carton', 'Inner Carton', 'Shipper Label', 'Tamper-Proof Seal']
 export const LANGUAGES = ['English', 'French', 'Portuguese', 'Spanish', 'Arabic', 'Vietnamese', 'Burmese', 'Khmer', 'Swahili']
 export const PRIORITIES = [
   { value: 'normal', label: 'Normal' },

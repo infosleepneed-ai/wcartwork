@@ -10,6 +10,7 @@ import ArtworkReview from './pages/ArtworkReview'
 import ArtworkApproval from './pages/ArtworkApproval'
 import MasterData from './pages/MasterData'
 import UsersRoles from './pages/UsersRoles'
+import ComingSoon from './pages/ComingSoon'
 import CountryRequirements from './pages/CountryRequirements'
 
 function Protected() {
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/master/:kind" element={<MasterData />} />
         <Route path="/admin/users" element={<UsersRoles />} />
         <Route path="/module/country-requirements" element={<CountryRequirements />} />
+        <Route path="/module/:name" element={<ComingSoon />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

@@ -5,27 +5,50 @@ import { Modal } from './ui'
 import { FileDrop, FileCard } from './FileDrop'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
+import { supabase } from '../lib/supabase'
 import * as api from '../lib/api'
 import { ARTWORK_TYPES, LANGUAGES, PRIORITIES, productName, timeAgo } from '../lib/constants'
 
-const STEPS = ['Product', 'Market', 'Packaging', 'Files', 'Review']
-const EMPTY = { product_id: '', country_code: '', customer_id: '', language: 'English', artwork_type: 'Carton', pack_size: '', storage: '', priority: 'normal', due_date: '', notes: '' }
+const STEPS = ['Product', 'Market', 'Artwork', 'Batch & notes', 'Files', 'Review']
+const EMPTY = {
+  product_id: '', brand_name: '', mfg_site: '', license_code: '',
+  country_code: '', customer_id: '', registration_no: '', marketing_person: '', language: 'English',
+  types: [], version_no: '1.0', packaging_type: '', packing_style: '', change_type: '', effective_date: '', priority: 'normal', due_date: '',
+  mfg_date: '', exp_date: '', batch_no: '', notes: '', regulatory_comments: ''
+}
+const LOOKUP_KINDS = ['packaging_type', 'packing_style', 'change_type', 'mfg_site', 'license_code', 'marketing_person', 'brand_name']
+
+function Req() { return <span style={{ color: 'var(--s-rej-fg)' }}> *</span> }
+
+// Text input with suggestions; anything new typed is saved to the list on submit
+function Combo({ id, label, required, value, onChange, options, placeholder }) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}{required && <Req />}</label>
+      <input id={id} className="input" list={`${id}-list`} value={value} placeholder={placeholder || 'Select or type…'}
+        onChange={(e) => onChange(e.target.value)} autoComplete="off" />
+      <datalist id={`${id}-list`}>{options.map((o) => <option key={o} value={o} />)}</datalist>
+    </div>
+  )
+}
 
 export default function CreateArtworkModal() {
   const { ui, close, open, products, countries, customers, toast, reload } = useStore()
   const { user } = useAuth()
   const nav = useNavigate()
-  const key = `wc-draft-${user?.id}`
+  const key = `wc-draft2-${user?.id}`
   const [step, setStep] = useState(0)
   const [f, setF] = useState(EMPTY)
   const [savedAt, setSavedAt] = useState(null)
   const [, tick] = useState(0)
   const [q, setQ] = useState('')
   const [showSuggest, setShowSuggest] = useState(false)
-  const [artFile, setArtFile] = useState(null)
+  const [typeFiles, setTypeFiles] = useState({})
   const [refs, setRefs] = useState([])
   const [fileState, setFileState] = useState({})
   const [busy, setBusy] = useState(false)
+  const [lookups, setLookups] = useState({})
+  const [people, setPeople] = useState([])
   const loaded = useRef(false)
 
   useEffect(() => {
@@ -35,11 +58,14 @@ export default function CreateArtworkModal() {
       if (d?.f) { setF({ ...EMPTY, ...d.f }); setSavedAt(d.at); setStep(d.step || 0) }
       else { setF(EMPTY); setStep(0); setSavedAt(null) }
     } catch { setF(EMPTY) }
-    setArtFile(null); setRefs([]); setFileState({}); setQ('')
+    setTypeFiles({}); setRefs([]); setFileState({}); setQ('')
     loaded.current = true
+    supabase.from('lookups').select('kind, value').order('value').then(({ data }) => {
+      const m = {}; (data || []).forEach((r) => { (m[r.kind] = m[r.kind] || []).push(r.value) }); setLookups(m)
+    })
+    api.listProfiles().then((p) => setPeople(p.map((x) => x.full_name).filter(Boolean))).catch(() => {})
   }, [ui.create, key])
 
-  // Autosave the form (files are kept in memory only)
   useEffect(() => {
     if (!ui.create || !loaded.current) return
     const t = setTimeout(() => {
@@ -59,52 +85,86 @@ export default function CreateArtworkModal() {
   const product = products.find((p) => p.id === f.product_id)
   const country = countries.find((c) => c.code === f.country_code)
   const customer = customers.find((c) => c.id === f.customer_id)
+  useEffect(() => {
+    if (product && !q) setQ(productName(product))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product])
+
   const matches = useMemo(() => {
     const t = q.trim().toLowerCase()
     if (!t) return products.slice(0, 6)
     return products.filter((p) => `${productName(p)} ${p.brand || ''}`.toLowerCase().includes(t)).slice(0, 6)
   }, [q, products])
 
-  useEffect(() => {
-    if (product && !q) setQ(productName(product))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product])
+  const L = (k, extra = []) => [...new Set([...(lookups[k] || []), ...extra])]
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  const val = (k) => (v) => setF({ ...f, [k]: v })
 
   const valid = [
-    Boolean(f.product_id),
-    Boolean(f.country_code && f.language),
-    Boolean(f.artwork_type),
-    true,
-    true
+    Boolean(f.product_id && f.brand_name.trim() && f.mfg_site.trim()),
+    Boolean(f.country_code && f.customer_id && f.marketing_person.trim()),
+    Boolean(f.types.length && f.version_no.trim() && f.change_type.trim()),
+    true, true, true
   ]
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  const missingMsg = [
+    'Select product, brand name and manufacturing site',
+    'Select country, buyer and marketing person',
+    'Pick at least one artwork type, version and type of change',
+    '', '', ''
+  ]
+
+  const pickProduct = (p) => {
+    setF({ ...f, product_id: p.id, brand_name: f.brand_name || p.brand || '', mfg_site: f.mfg_site || p.plant || '' })
+    setQ(productName(p)); setShowSuggest(false)
+  }
+  const toggleType = (t) => setF({ ...f, types: f.types.includes(t) ? f.types.filter((x) => x !== t) : [...f.types, t] })
 
   const submit = async () => {
     setBusy(true)
     try {
-      const art = await api.createArtwork({
-        product_id: f.product_id, country_code: f.country_code, customer_id: f.customer_id || null,
-        language: f.language, artwork_type: f.artwork_type, pack_size: f.pack_size || null,
-        priority: f.priority, due_date: f.due_date || null, notes: f.notes || null
-      })
-      if (artFile) {
-        setFileState((s) => ({ ...s, [artFile.name]: 'uploading' }))
-        await api.addVersion(art.id, artFile, {
-          label: 'V1.0', note: 'Initial artwork',
-          metadata: Object.fromEntries(Object.entries({ storage: f.storage, pack_size: f.pack_size }).filter(([, v]) => v))
-        })
-        setFileState((s) => ({ ...s, [artFile.name]: 'done' }))
+      const requestNo = `REQ-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`
+      const label = `V${f.version_no.trim().replace(/^v/i, '')}`
+      const common = {
+        request_no: requestNo, product_id: f.product_id, brand_name: f.brand_name.trim() || null, mfg_site: f.mfg_site.trim() || null,
+        license_code: f.license_code.trim() || null, country_code: f.country_code, customer_id: f.customer_id || null,
+        registration_no: f.registration_no.trim() || null, marketing_person: f.marketing_person.trim() || null, language: f.language,
+        packaging_type: f.packaging_type.trim() || null, packing_style: f.packing_style.trim() || null, pack_size: f.packing_style.trim() || null,
+        change_type: f.change_type.trim() || null, effective_date: f.effective_date || null, priority: f.priority, due_date: f.due_date || null,
+        mfg_date: f.mfg_date || null, exp_date: f.exp_date || null, batch_no: f.batch_no.trim() || null,
+        notes: f.notes.trim() || null, regulatory_comments: f.regulatory_comments.trim() || null
       }
+      const created = []
+      for (const t of f.types) {
+        const art = await api.createArtwork({ ...common, artwork_type: t })
+        created.push(art)
+        const file = typeFiles[t]
+        if (file) {
+          setFileState((s) => ({ ...s, [t]: 'uploading' }))
+          await api.addVersion(art.id, file, {
+            label, note: f.change_type || 'Initial artwork',
+            metadata: Object.fromEntries(Object.entries({ pack_size: f.packing_style, registration_no: f.registration_no }).filter(([, v]) => v))
+          })
+          setFileState((s) => ({ ...s, [t]: 'done' }))
+        }
+      }
+      // Other documents: upload once, link to every artwork in this request
       for (const r of refs) {
-        setFileState((s) => ({ ...s, [r.name]: 'uploading' }))
-        await api.addAttachment(art.id, r)
-        setFileState((s) => ({ ...s, [r.name]: 'done' }))
+        setFileState((s) => ({ ...s, [`ref:${r.name}`]: 'uploading' }))
+        const path = await api.uploadFile(created[0].id, r)
+        const rows = created.map((a) => ({ artwork_id: a.id, file_path: path, file_name: r.name, mime_type: r.type || null, size_bytes: r.size, uploaded_by: user.id }))
+        const { error } = await supabase.from('attachments').insert(rows)
+        if (error) throw new Error(error.message)
+        setFileState((s) => ({ ...s, [`ref:${r.name}`]: 'done' }))
       }
+      // Remember any new dropdown values for next time
+      const newLookups = LOOKUP_KINDS.map((k) => ({ kind: k, value: String(f[k] || '').trim() })).filter((x) => x.value)
+      if (newLookups.length) await supabase.from('lookups').upsert(newLookups, { onConflict: 'kind,value', ignoreDuplicates: true })
+
       try { localStorage.removeItem(key) } catch { /* ignore */ }
-      toast(`${art.code} created`)
+      toast(created.length === 1 ? `${created[0].code} created` : `${requestNo}: ${created.length} artworks created`)
       await reload()
       close('create')
-      nav(`/artworks/${art.id}`)
+      nav(created.length === 1 ? `/artworks/${created[0].id}` : '/artworks?view=mycreated')
     } catch (e) {
       toast(e.message, 'error')
     } finally { setBusy(false) }
@@ -115,15 +175,21 @@ export default function CreateArtworkModal() {
     setF(EMPTY); setStep(0); setSavedAt(null); close('create')
   }
 
+  const pm = f.types.length > 1 ? `${f.types.length} artworks will be created — one per type, each with its own review and approval.` : ''
+
   return (
     <Modal open={ui.create} onClose={() => close('create')} title="New artwork request" size="lg"
       footer={<>
-        <span className="hint" style={{ marginRight: 'auto' }}>{savedAt ? `Draft saved ${timeAgo(savedAt).toLowerCase()}` : 'Draft saves automatically'}</span>
+        <span className="hint" style={{ marginRight: 'auto' }}>
+          {!valid[step] ? missingMsg[step] : savedAt ? `Draft saved ${timeAgo(savedAt).toLowerCase()}` : 'Draft saves automatically'}
+        </span>
         {step === 0 ? <button className="btn btn-ghost" onClick={discard}>Discard</button>
           : <button className="btn btn-secondary" onClick={() => setStep(step - 1)} disabled={busy}>Back</button>}
         {step < STEPS.length - 1
           ? <button className="btn btn-primary" disabled={!valid[step]} onClick={() => setStep(step + 1)}>Continue</button>
-          : <button className="btn btn-primary" disabled={busy || !valid.slice(0, 3).every(Boolean)} onClick={submit}>{busy ? 'Creating…' : 'Create request'}</button>}
+          : <button className="btn btn-primary" disabled={busy || !valid.slice(0, 3).every(Boolean)} onClick={submit}>
+            {busy ? 'Creating…' : f.types.length > 1 ? `Create ${f.types.length} artworks` : 'Create request'}
+          </button>}
       </>}>
       <div style={{ paddingTop: 18 }}>
         <div className="stepper" aria-label="Progress">
@@ -140,21 +206,22 @@ export default function CreateArtworkModal() {
         </div>
       </div>
 
-      <div className="modal-body" style={{ minHeight: 300 }}>
+      <div className="modal-body" style={{ minHeight: 320 }}>
         {step === 0 && (
           <>
             <div className="field" style={{ position: 'relative' }}>
-              <label htmlFor="prod-q">Product</label>
+              <label htmlFor="prod-q">Product name<Req /></label>
               <div className="input-icon">
                 <Search size={17} />
                 <input id="prod-q" className="input" placeholder="Search product… e.g. Rosu" value={q}
-                  onChange={(e) => { setQ(e.target.value); setShowSuggest(true) }} onFocus={() => setShowSuggest(true)} onBlur={() => setTimeout(() => setShowSuggest(false), 150)} autoComplete="off" />
+                  onChange={(e) => { setQ(e.target.value); setShowSuggest(true) }} onFocus={() => setShowSuggest(true)}
+                  onBlur={() => setTimeout(() => setShowSuggest(false), 150)} autoComplete="off" />
               </div>
               {showSuggest && (
                 <div className="popover suggest">
                   {matches.length === 0 && <div style={{ padding: 12 }} className="muted">No product matches “{q}”.</div>}
                   {matches.map((p) => (
-                    <button key={p.id} className="menu-item" onClick={() => { setF({ ...f, product_id: p.id }); setQ(productName(p)); setShowSuggest(false) }}>
+                    <button key={p.id} className="menu-item" onMouseDown={(e) => e.preventDefault()} onClick={() => pickProduct(p)}>
                       <span className="menu-icon blue"><Package size={16} /></span>
                       <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontWeight: 500 }}>{productName(p)}</span>
@@ -162,30 +229,46 @@ export default function CreateArtworkModal() {
                       </span>
                     </button>
                   ))}
-                  <button className="menu-item" onClick={() => { setShowSuggest(false); open('master', 'product') }}>
+                  <button className="menu-item" onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowSuggest(false); open('master', 'product') }}>
                     <span className="menu-icon"><Plus size={16} /></span><span>Add a new product</span>
                   </button>
                 </div>
               )}
             </div>
-            {product && (
-              <div className="card card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14, background: 'var(--surface-2)' }}>
-                {[['Product', productName(product)], ['Brand', product.brand || '—'], ['Dosage', product.dosage_form || '—'], ['Strength', product.strength || '—'], ['Plant', product.plant || '—']].map(([k, v]) => (
-                  <div key={k} className="info" style={{ border: 0, padding: 0, background: 'transparent' }}><span>{k}</span><b>{v}</b></div>
-                ))}
-              </div>
-            )}
+            <div className="grid-2">
+              <Combo id="c-brand" label="Brand name" required value={f.brand_name} onChange={val('brand_name')}
+                options={L('brand_name', products.map((p) => p.brand).filter(Boolean))} placeholder="Brand, or Generic" />
+              <Combo id="c-site" label="Mfg sites" required value={f.mfg_site} onChange={val('mfg_site')}
+                options={L('mfg_site', products.map((p) => p.plant).filter(Boolean))} />
+              <Combo id="c-lic" label="Manufacturing / License code" value={f.license_code} onChange={val('license_code')} options={L('license_code')} />
+            </div>
           </>
         )}
 
         {step === 1 && (
           <div className="grid-2">
             <div className="field">
-              <label htmlFor="c-country">Market</label>
-              <select id="c-country" className="select" value={f.country_code} onChange={set('country_code')}>
-                <option value="">Select country</option>
+              <label htmlFor="c-country">Country<Req /></label>
+              <select id="c-country" className="select" value={f.country_code} onChange={(e) => setF({ ...f, country_code: e.target.value, customer_id: '' })}>
+                <option value="">--Select--</option>
                 {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
               </select>
+            </div>
+            <div className="field">
+              <label htmlFor="c-cust">Buyer name<Req /></label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select id="c-cust" className="select" value={f.customer_id} onChange={set('customer_id')}>
+                  <option value="">--Select--</option>
+                  {customers.filter((c) => !f.country_code || !c.country_code || c.country_code === f.country_code)
+                    .map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <button type="button" className="btn btn-secondary" onClick={() => open('master', 'customer')} aria-label="Add buyer"><Plus size={16} /></button>
+              </div>
+            </div>
+            <Combo id="c-mkt" label="Marketing person" required value={f.marketing_person} onChange={val('marketing_person')} options={L('marketing_person', people)} />
+            <div className="field">
+              <label htmlFor="c-reg">Registration no.</label>
+              <input id="c-reg" className="input" value={f.registration_no} onChange={set('registration_no')} placeholder="Product registration number in this market" />
             </div>
             <div className="field">
               <label htmlFor="c-lang">Language</label>
@@ -193,83 +276,112 @@ export default function CreateArtworkModal() {
                 {LANGUAGES.map((l) => <option key={l}>{l}</option>)}
               </select>
             </div>
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label htmlFor="c-cust">Customer <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <select id="c-cust" className="select" value={f.customer_id} onChange={set('customer_id')}>
-                  <option value="">No customer</option>
-                  {customers.filter((c) => !f.country_code || !c.country_code || c.country_code === f.country_code)
-                    .map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <button type="button" className="btn btn-secondary" onClick={() => open('master', 'customer')}><Plus size={16} />New</button>
-              </div>
-            </div>
           </div>
         )}
 
         {step === 2 && (
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor="c-type">Artwork type</label>
-              <select id="c-type" className="select" value={f.artwork_type} onChange={set('artwork_type')}>
-                {ARTWORK_TYPES.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="c-pack">Pack size</label>
-              <input id="c-pack" className="input" placeholder="e.g. 3 × 10 Tablets" value={f.pack_size} onChange={set('pack_size')} />
-            </div>
-            <div className="field">
-              <label htmlFor="c-store">Storage condition</label>
-              <input id="c-store" className="input" placeholder="e.g. Store below 30°C" value={f.storage} onChange={set('storage')} />
-            </div>
-            <div className="field">
-              <label htmlFor="c-due">Due date</label>
-              <input id="c-due" type="date" className="input" value={f.due_date} onChange={set('due_date')} />
-            </div>
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <span className="label">Priority</span>
-              <div className="segmented" role="group" aria-label="Priority" style={{ alignSelf: 'flex-start' }}>
-                {PRIORITIES.map((p) => (
-                  <button type="button" key={p.value} className={f.priority === p.value ? 'on' : ''} onClick={() => setF({ ...f, priority: p.value })}>{p.label}</button>
-                ))}
-              </div>
-            </div>
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label htmlFor="c-notes">Requirements and notes</label>
-              <textarea id="c-notes" className="textarea" placeholder="Country text requirements, special instructions for the designer…" value={f.notes} onChange={set('notes')} />
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
           <>
             <div className="field">
-              <span className="label">Artwork file (becomes V1.0)</span>
-              {artFile ? <FileCard file={artFile} state={fileState[artFile.name]} onRemove={() => setArtFile(null)} />
-                : <FileDrop onFiles={([x]) => setArtFile(x)} accept=".pdf,.png,.jpg,.jpeg,.webp" hint="PDF, JPG, PNG" />}
-              <span className="hint">No file yet? Create the request now — the designer can upload V1.0 later.</span>
+              <span className="label">Artwork type<Req /> <span className="muted" style={{ fontWeight: 400 }}>— select all that apply</span></span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {ARTWORK_TYPES.map((t) => {
+                  const on = f.types.includes(t)
+                  return (
+                    <button key={t} type="button" className={`fpill${on ? ' on' : ''}`} aria-pressed={on} onClick={() => toggleType(t)}>
+                      <span className={`check${on ? ' on' : ''}`}>{on && <Check size={12} strokeWidth={3} />}</span>{t}
+                    </button>
+                  )
+                })}
+              </div>
+              {pm && <span className="hint">{pm}</span>}
             </div>
-            <div className="field">
-              <span className="label">Reference documents</span>
-              <FileDrop multiple onFiles={(fs) => setRefs((r) => [...r, ...fs])} hint="PDF, JPG, PNG, DOCX — master card, previous artwork, registration" />
-              {refs.map((r, i) => <FileCard key={r.name + i} file={r} state={fileState[r.name]} onRemove={() => setRefs(refs.filter((_, j) => j !== i))} />)}
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="c-ver">Version no.<Req /></label>
+                <input id="c-ver" className="input mono" value={f.version_no} onChange={set('version_no')} placeholder="1.0" />
+              </div>
+              <Combo id="c-change" label="Type of change" required value={f.change_type} onChange={val('change_type')} options={L('change_type')} />
+              <Combo id="c-pkg" label="Packaging type" value={f.packaging_type} onChange={val('packaging_type')} options={L('packaging_type')} />
+              <Combo id="c-style" label="Packing style" value={f.packing_style} onChange={val('packing_style')} options={L('packing_style')} placeholder="e.g. 3 x 10" />
+              <div className="field">
+                <label htmlFor="c-eff">Artwork tentative effective date</label>
+                <input id="c-eff" type="date" className="input" value={f.effective_date} onChange={set('effective_date')} />
+              </div>
+              <div className="field">
+                <label htmlFor="c-due">Approval due date</label>
+                <input id="c-due" type="date" className="input" value={f.due_date} onChange={set('due_date')} />
+              </div>
+              <div className="field" style={{ gridColumn: '1 / -1' }}>
+                <span className="label">Priority</span>
+                <div className="segmented" role="group" aria-label="Priority" style={{ alignSelf: 'flex-start' }}>
+                  {PRIORITIES.map((p) => (
+                    <button type="button" key={p.value} className={f.priority === p.value ? 'on' : ''} onClick={() => setF({ ...f, priority: p.value })}>{p.label}</button>
+                  ))}
+                </div>
+              </div>
             </div>
           </>
         )}
 
+        {step === 3 && (
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="c-mfg">Mfg. date</label>
+              <input id="c-mfg" type="date" className="input" value={f.mfg_date} onChange={set('mfg_date')} />
+            </div>
+            <div className="field">
+              <label htmlFor="c-exp">Exp. date</label>
+              <input id="c-exp" type="date" className="input" value={f.exp_date} onChange={set('exp_date')} />
+              {f.mfg_date && f.exp_date && f.exp_date <= f.mfg_date && <span className="error-text">Exp. date must be after Mfg. date</span>}
+            </div>
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="c-batch">Batch no.</label>
+              <textarea id="c-batch" className="textarea" rows={2} value={f.batch_no} onChange={set('batch_no')} placeholder="One or more batch numbers" />
+            </div>
+            <div className="field">
+              <label htmlFor="c-notes">Remarks</label>
+              <textarea id="c-notes" className="textarea" rows={4} value={f.notes} onChange={set('notes')} placeholder="Instructions for the designer" />
+            </div>
+            <div className="field">
+              <label htmlFor="c-regc">Regulatory comments</label>
+              <textarea id="c-regc" className="textarea" rows={4} value={f.regulatory_comments} onChange={set('regulatory_comments')} placeholder="Country text requirements, guideline references" />
+            </div>
+          </div>
+        )}
+
         {step === 4 && (
+          <>
+            <div className="field">
+              <span className="label">Artwork files <span className="muted" style={{ fontWeight: 400 }}>— optional, becomes V{f.version_no.replace(/^v/i, '')} of each artwork</span></span>
+              {f.types.map((t) => (
+                <div key={t} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t}</span>
+                  {typeFiles[t]
+                    ? <FileCard file={typeFiles[t]} state={fileState[t]} onRemove={() => { const n = { ...typeFiles }; delete n[t]; setTypeFiles(n) }} />
+                    : <FileDrop onFiles={([x]) => setTypeFiles({ ...typeFiles, [t]: x })} accept=".pdf,.png,.jpg,.jpeg,.webp" hint="PDF, JPG, PNG" />}
+                </div>
+              ))}
+              <span className="hint">No file yet? Create the request now — the designer can upload later.</span>
+            </div>
+            <div className="field">
+              <span className="label">Other documents</span>
+              <FileDrop multiple accept="*" onFiles={(fs) => setRefs((r) => [...r, ...fs])} hint="Multiple files · all file formats" />
+              {refs.map((r, i) => <FileCard key={r.name + i} file={r} state={fileState[`ref:${r.name}`]} onRemove={() => setRefs(refs.filter((_, j) => j !== i))} />)}
+            </div>
+          </>
+        )}
+
+        {step === 5 && (
           <div className="info-grid">
             {[
-              ['Product', productName(product)], ['Market', country?.name], ['Customer', customer?.name || '—'],
-              ['Language', f.language], ['Artwork type', f.artwork_type], ['Pack size', f.pack_size || '—'],
-              ['Storage', f.storage || '—'], ['Priority', PRIORITIES.find((p) => p.value === f.priority)?.label],
-              ['Due date', f.due_date || '—'], ['Artwork file', artFile?.name || 'Upload later'], ['References', `${refs.length} file${refs.length === 1 ? '' : 's'}`]
-            ].map(([k, v]) => <div className="info" key={k}><span>{k}</span><b title={v}>{v}</b></div>)}
-            <div className="notice info" style={{ gridColumn: '1 / -1' }}>
-              <Check size={17} />
-              <span>The request follows the standard workflow: Design Review → Regulatory Review → Export Review → Customer Approval → Final Approval.</span>
-            </div>
+              ['Product', productName(product)], ['Brand name', f.brand_name], ['Mfg site', f.mfg_site], ['License code', f.license_code || '—'],
+              ['Country', country?.name], ['Buyer', customer?.name], ['Marketing person', f.marketing_person], ['Registration no.', f.registration_no || '—'],
+              ['Artwork types', f.types.join(', ')], ['Version', `V${f.version_no.replace(/^v/i, '')}`], ['Type of change', f.change_type],
+              ['Packaging', [f.packaging_type, f.packing_style].filter(Boolean).join(' · ') || '—'], ['Effective date', f.effective_date || '—'],
+              ['Mfg / Exp', [f.mfg_date, f.exp_date].filter(Boolean).join(' → ') || '—'], ['Batch no.', f.batch_no || '—'],
+              ['Files', `${Object.keys(typeFiles).length} artwork · ${refs.length} other`]
+            ].map(([k, v]) => <div className="info" key={k}><span>{k}</span><b title={v}>{v || '—'}</b></div>)}
+            {pm && <div className="notice info" style={{ gridColumn: '1 / -1' }}><Check size={17} /><span>{pm}</span></div>}
           </div>
         )}
       </div>

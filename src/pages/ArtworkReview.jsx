@@ -165,8 +165,8 @@ export default function ArtworkReview() {
   }
 
   const info = [
-    ['Product', productName(artwork.product)], ['Market', artwork.country?.name], ['Customer', artwork.customer?.name || '—'],
-    ['Pack size', version?.metadata?.pack_size || artwork.pack_size || '—'], ['Language', artwork.language], ['Artwork type', artwork.artwork_type],
+    ['Product', productName(artwork.product)], ['Market', artwork.country?.name], ['Buyer', artwork.customer?.name || '—'],
+    ['Pack size', version?.metadata?.pack_size || artwork.packing_style || artwork.pack_size || '—'], ['Language', artwork.language], ['Artwork type', artwork.artwork_type],
     ['Version', version?.version_label || '—'], ['Requested by', artwork.creator?.full_name || '—'],
     ['Due date', artwork.due_date ? fmtDate(artwork.due_date) : '—', due && ['Overdue', 'Due today'].includes(due.label)]
   ]
@@ -345,7 +345,12 @@ export default function ArtworkReview() {
           {tab === 'Details' && (
             <div style={{ padding: '8px 20px 20px', overflowY: 'auto' }}>
               {[
-                ['Generic name', artwork.product?.name], ['Dosage form', artwork.product?.dosage_form], ['Plant', artwork.product?.plant],
+                ['Request no.', artwork.request_no], ['Brand name', artwork.brand_name], ['Mfg site', artwork.mfg_site || artwork.product?.plant],
+                ['License code', artwork.license_code], ['Marketing person', artwork.marketing_person], ['Registration no.', artwork.registration_no],
+                ['Type of change', artwork.change_type], ['Packaging type', artwork.packaging_type], ['Packing style', artwork.packing_style],
+                ['Effective date', artwork.effective_date && fmtDate(artwork.effective_date)], ['Mfg. date', artwork.mfg_date && fmtDate(artwork.mfg_date)],
+                ['Exp. date', artwork.exp_date && fmtDate(artwork.exp_date)], ['Batch no.', artwork.batch_no],
+                ['Generic name', artwork.product?.name], ['Dosage form', artwork.product?.dosage_form],
                 ['Priority', artwork.priority[0].toUpperCase() + artwork.priority.slice(1)], ['Created', fmtDateTime(artwork.created_at)],
                 ...METADATA_FIELDS.map((m) => [m.label, version?.metadata?.[m.key]])
               ].filter(([, v]) => v).map(([k, v]) => (
@@ -355,8 +360,14 @@ export default function ArtworkReview() {
               ))}
               {artwork.notes && (
                 <div style={{ paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span className="muted">Requirements and notes</span>
+                  <span className="muted">Remarks</span>
                   <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{artwork.notes}</p>
+                </div>
+              )}
+              {artwork.regulatory_comments && (
+                <div style={{ paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span className="muted">Regulatory comments</span>
+                  <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{artwork.regulatory_comments}</p>
                 </div>
               )}
             </div>
