@@ -12,7 +12,7 @@ const LIST_SELECT = `
   customer:customers(*),
   creator:profiles!artworks_created_by_fkey(id, full_name, role),
   current_version:artwork_versions!fk_current_version(id, version_label, file_path, file_name, mime_type, created_at, metadata),
-  steps:approval_steps(id, position, name, role, state, completed_at)
+  steps:approval_steps(id, position, name, role, assignee_ids, state, completed_at)
 `
 
 // ---------- Artworks ----------
@@ -174,6 +174,23 @@ export async function listProfiles() {
 }
 export async function updateProfile(id, fields) {
   return check(await supabase.from('profiles').update(fields).eq('id', id))
+}
+
+// ---------- Workflows ----------
+export async function listWorkflows() {
+  const rows = check(await supabase.from('workflows').select('*, steps:workflow_steps(*)').order('created_at'))
+  rows.forEach((w) => w.steps?.sort((a, b) => a.position - b.position))
+  return rows
+}
+export async function saveWorkflow(w) {
+  return check(await supabase.rpc('save_workflow', {
+    p_id: w.id || null, p_name: w.name, p_description: w.description || null, p_default: !!w.is_default,
+    p_active: !!w.active, p_allowed_roles: w.allowed_roles || [],
+    p_steps: w.steps.map((s) => ({ name: s.name, role: s.role || '', assignee_ids: s.assignee_ids || [] }))
+  }))
+}
+export async function deleteWorkflow(id) {
+  return check(await supabase.from('workflows').delete().eq('id', id))
 }
 
 // ---------- Saved views ----------

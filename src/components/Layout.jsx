@@ -23,11 +23,12 @@ function titleFor(path, search) {
   }
   if (path.startsWith('/master/')) { const k = path.split('/')[2]; return [k[0].toUpperCase() + k.slice(1), 'Master'] }
   if (path.startsWith('/admin/users')) return ['Users & Roles', 'Admin']
+  if (path.startsWith('/admin/workflows')) return ['Workflows', 'Admin']
   if (path.startsWith('/module/')) {
     const k = path.split('/')[2].replace(/-/g, ' ')
     return [k.replace(/\b\w/g, (c) => c.toUpperCase()), 'Modules']
   }
-  return ['WC Artwork Hub', 'Home']
+  return ['Artwork Hub', 'Home']
 }
 
 export default function Layout() {
@@ -38,7 +39,7 @@ export default function Layout() {
   const [title, crumb] = titleFor(loc.pathname, loc.search)
 
   useEffect(() => { try { localStorage.setItem('wc-sidebar', collapsed ? '1' : '0') } catch { /* ignore */ } }, [collapsed])
-  useEffect(() => { document.title = `${title} · WC Artwork Hub` }, [title])
+  useEffect(() => { document.title = `${title} · Artwork Hub` }, [title])
   useEffect(() => { setMobileOpen(false); window.scrollTo(0, 0) }, [loc.pathname])
 
   return (

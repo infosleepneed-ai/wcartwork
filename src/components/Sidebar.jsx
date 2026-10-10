@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid, Images, SquarePlus, Eye, Clock, CircleCheck, MessageSquareWarning, Folder, Globe, FileText,
   Package, Building2, Flag, SquareCheck, Bell, ChartColumn, ClipboardList, Users, SlidersHorizontal,
-  PanelLeftClose, PanelLeftOpen, LogOut, Moon, Sun
+  PanelLeftClose, PanelLeftOpen, LogOut, Moon, Sun, Workflow
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
@@ -71,6 +71,7 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, closeMobi
     },
     {
       label: 'Admin', items: [
+        { to: '/admin/workflows', icon: Workflow, text: 'Workflows' },
         { to: '/admin/users', icon: Users, text: 'Users & Roles' },
         { to: '/module/settings', icon: SlidersHorizontal, text: 'Settings' }
       ]
@@ -81,8 +82,8 @@ export default function Sidebar({ collapsed, setCollapsed, mobileOpen, closeMobi
     <nav className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`} aria-label="Main">
       <div className="brand">
         <Link to="/dashboard" className="brand-link" onClick={closeMobile}>
-          <span className="brand-mark">WC</span>
-          <span className="brand-text"><b>WC Artwork Hub</b><small>West-Coast Pharmaceutical</small></span>
+          <span className="brand-mark">AH</span>
+          <span className="brand-text"><b>Artwork Hub</b><small>Review · Approve · Track</small></span>
         </Link>
         <button className="icon-btn sm collapse-btn" onClick={() => setCollapsed(true)} aria-label="Collapse sidebar"><PanelLeftClose size={18} /></button>
       </div>

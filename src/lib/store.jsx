@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase } from './supabase'
 import * as api from './api'
 import { useAuth } from './auth'
-import { currentStep } from './constants'
+import { currentStep, canSignStep } from './constants'
 
 const StoreCtx = createContext(null)
 
@@ -14,6 +14,7 @@ export function StoreProvider({ children }) {
   const [products, setProducts] = useState([])
   const [countries, setCountries] = useState([])
   const [customers, setCustomers] = useState([])
+  const [people, setPeople] = useState([])
   const [toasts, setToasts] = useState([])
   const [ui, setUi] = useState({ create: false, palette: false, notif: false, master: null })
   const reloadTimer = useRef(null)
@@ -36,8 +37,8 @@ export function StoreProvider({ children }) {
 
   const reloadMaster = useCallback(async () => {
     try {
-      const [p, c, cu] = await Promise.all([api.listProducts(), api.listCountries(), api.listCustomers()])
-      setProducts(p); setCountries(c); setCustomers(cu)
+      const [p, c, cu, pe] = await Promise.all([api.listProducts(), api.listCountries(), api.listCustomers(), api.listProfiles()])
+      setProducts(p); setCountries(c); setCustomers(cu); setPeople(pe)
     } catch (e) { toast(e.message, 'error') }
   }, [toast])
 
@@ -68,8 +69,8 @@ export function StoreProvider({ children }) {
     const s = currentStep(a)
     if (!s) return false
     if (a.status === 'correction') return role === 'designer' || role === 'admin' || a.created_by === user?.id
-    return s.role === role || role === 'admin'
-  }), [artworks, role, user])
+    return canSignStep(s, profile)
+  }), [artworks, role, user, profile])
 
   const counts = useMemo(() => {
     const c = { draft: 0, under_review: 0, correction: 0, pending_approval: 0, approved: 0, rejected: 0 }
@@ -90,7 +91,7 @@ export function StoreProvider({ children }) {
       setNotifications((n) => n.map((x) => (x.id === id ? { ...x, read: true } : x)))
       try { await api.markNotification(id) } catch { /* ignore */ }
     },
-    products, countries, customers, reloadMaster,
+    products, countries, customers, people, reloadMaster,
     toast, toasts,
     ui,
     open: (k, v = true) => setUi((u) => ({ ...u, [k]: v })),

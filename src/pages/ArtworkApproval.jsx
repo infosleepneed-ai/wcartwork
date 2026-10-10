@@ -4,7 +4,7 @@ import { ChevronLeft, Check, Minus, Plus, ArrowRight, TriangleAlert, Clock, Shie
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import * as api from '../lib/api'
-import { ROLE_TEAM, METADATA_FIELDS, fmtDate, fmtDateTime, timeAgo, currentStep } from '../lib/constants'
+import { METADATA_FIELDS, fmtDate, fmtDateTime, timeAgo, currentStep, stepWho } from '../lib/constants'
 import { Avatar, Empty, Spinner } from '../components/ui'
 import ArtworkSurface from '../components/ArtworkSurface'
 import UploadVersionModal from '../components/UploadVersionModal'
@@ -34,7 +34,7 @@ function ComparePane({ version, zoom, colW, scrollRef, onScroll, tag }) {
 export default function ArtworkApproval() {
   const { id } = useParams()
   const { profile, user } = useAuth()
-  const { toast, reload } = useStore()
+  const { toast, reload, people } = useStore()
   const { artwork, versions, comments, error, reloadAll } = useArtworkData(id)
   const [leftId, setLeftId] = useState(null)
   const [rightId, setRightId] = useState(null)
@@ -135,7 +135,7 @@ export default function ArtworkApproval() {
           {done.decision === 'approve' ? <ShieldCheck size={20} /> : <TriangleAlert size={20} />}
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <b style={{ fontSize: 15 }}>{done.decision === 'approve' ? `${done.step} approved` : done.decision === 'correction' ? 'Correction requested' : 'Artwork rejected'}</b>
-            <span>E-signed by {profile?.full_name} · {fmtDateTime(done.at)}{done.decision === 'approve' && currentStep(artwork) ? ` · Now with ${ROLE_TEAM[currentStep(artwork).role]}` : ''}</span>
+            <span>E-signed by {profile?.full_name} · {fmtDateTime(done.at)}{done.decision === 'approve' && currentStep(artwork) ? ` · Now with ${stepWho(currentStep(artwork), people)}` : ''}</span>
           </span>
         </div>
       )}
@@ -159,8 +159,8 @@ export default function ArtworkApproval() {
                     {s.state === 'done' ? `Completed · ${fmtDate(s.completed_at)}` : s.state === 'current' ? (artwork.status === 'correction' ? 'Waiting for correction' : 'Current') : 'Pending'}
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Avatar name={s.completer?.full_name || ROLE_TEAM[s.role]} size={24} />
-                    <span className="ellipsis" style={{ fontSize: 13, color: 'var(--text-2)' }}>{s.completer?.full_name || ROLE_TEAM[s.role]}</span>
+                    <Avatar name={s.completer?.full_name || stepWho(s, people)} size={24} />
+                    <span className="ellipsis" style={{ fontSize: 13, color: 'var(--text-2)' }}>{s.completer?.full_name || stepWho(s, people)}</span>
                   </span>
                 </div>
               </div>
@@ -231,7 +231,7 @@ export default function ArtworkApproval() {
             ) : artwork.status === 'rejected' ? (
               <div className="notice warn"><TriangleAlert size={18} /><span>This artwork was rejected. Upload a new version to restart the review.</span></div>
             ) : !allowed ? (
-              <div className="notice info"><Clock size={18} /><span>Waiting for the <b>{ROLE_TEAM[step?.role]}</b> to complete <b>{step?.name}</b>. You’ll be able to act when it reaches your team.</span></div>
+              <div className="notice info"><Clock size={18} /><span>Waiting for <b>{stepWho(step, people)}</b> to complete <b>{step?.name}</b>. You’ll be able to act when it reaches your team.</span></div>
             ) : !artwork.current_version_id ? (
               <div className="notice warn"><TriangleAlert size={18} /><span>Upload an artwork file before approving.</span></div>
             ) : (

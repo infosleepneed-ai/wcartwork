@@ -8,7 +8,7 @@ import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import * as api from '../lib/api'
-import { ROLE_LABEL, ROLE_TEAM, METADATA_FIELDS, productName, timeAgo, fmtDate, fmtDateTime, currentStep, dueInfo, extOf, fileSize } from '../lib/constants'
+import { ROLE_LABEL, ROLE_TEAM, METADATA_FIELDS, productName, timeAgo, fmtDate, fmtDateTime, currentStep, dueInfo, extOf, fileSize, stepWho, canSignStep } from '../lib/constants'
 import { StatusPill, Avatar, Empty, Spinner, Modal } from '../components/ui'
 import ArtworkSurface from '../components/ArtworkSurface'
 import UploadVersionModal from '../components/UploadVersionModal'
@@ -71,14 +71,14 @@ export function ArtworkHeader({ artwork, actions }) {
 export function canDecide(artwork, profile) {
   const step = currentStep(artwork)
   if (!step || ['approved', 'rejected'].includes(artwork?.status)) return false
-  return profile?.role === 'admin' || profile?.role === step.role
+  return canSignStep(step, profile)
 }
 
 export default function ArtworkReview() {
   const { id } = useParams()
   const nav = useNavigate()
   const { profile, user } = useAuth()
-  const { toast } = useStore()
+  const { toast, people } = useStore()
   const { artwork, versions, comments, attachments, error, reloadAll, loadComments, loadAttachments } = useArtworkData(id)
 
   const [versionId, setVersionId] = useState(null)
@@ -175,7 +175,7 @@ export default function ArtworkReview() {
     <main className="page wide">
       <ArtworkHeader artwork={artwork} actions={<>
         {canUpload && <button className="btn btn-secondary" onClick={() => setUploadOpen(true)}><Upload size={16} />Upload version</button>}
-        <button className="btn btn-warn" disabled={!allowed || !version} title={allowed ? '' : step ? `Only the ${ROLE_TEAM[step.role]} can act on ${step.name}` : ''} onClick={() => setCorrOpen(true)}>
+        <button className="btn btn-warn" disabled={!allowed || !version} title={allowed ? '' : step ? `Only ${stepWho(step, people)} can act on ${step.name}` : ''} onClick={() => setCorrOpen(true)}>
           <RotateCcw size={16} />Request Correction
         </button>
         <button className="btn btn-primary" disabled={!version} onClick={() => nav(`/artworks/${id}/approval`)}><Check size={16} strokeWidth={2.4} />{allowed ? 'Approve Artwork' : 'Approval & Versions'}</button>
@@ -332,7 +332,7 @@ export default function ArtworkReview() {
                   <div style={{ paddingBottom: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <b style={{ fontSize: 14 }}>{s.name}</b>
                     <span style={{ fontSize: 13, color: s.state === 'current' ? 'var(--primary)' : 'var(--muted)', fontWeight: s.state === 'current' ? 500 : 400 }}>
-                      {s.state === 'done' ? `${s.completer?.full_name || ROLE_TEAM[s.role]} · ${fmtDate(s.completed_at)}` : s.state === 'current' ? `${ROLE_TEAM[s.role]} · in progress` : ROLE_TEAM[s.role]}
+                      {s.state === 'done' ? `${s.completer?.full_name || stepWho(s, people)} · ${fmtDate(s.completed_at)}` : s.state === 'current' ? `${stepWho(s, people)} · in progress` : stepWho(s, people)}
                     </span>
                     {s.remarks && <span className="hint">“{s.remarks}”</span>}
                   </div>

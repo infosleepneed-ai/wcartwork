@@ -4,7 +4,7 @@ import { ChevronDown, Check, Search, Bookmark, Download, Plus, MoreHorizontal, P
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import * as api from '../lib/api'
-import { STATUS_LABEL, STATUS_DOT, ROLE_TEAM, ARTWORK_TYPES, productName, timeAgo, todayISO, currentStep, fmtDate } from '../lib/constants'
+import { STATUS_LABEL, STATUS_DOT, ROLE_TEAM, ARTWORK_TYPES, productName, timeAgo, todayISO, currentStep, fmtDate, stepWho } from '../lib/constants'
 import { StatusPill, Avatar, Empty, ProductTile, Modal, Skeleton } from '../components/ui'
 
 const PAGE = 25
@@ -75,7 +75,7 @@ function RowMenu({ a }) {
 }
 
 export default function AllArtwork() {
-  const { artworks, myQueue, countries, loadingArtworks, open, toast } = useStore()
+  const { artworks, myQueue, countries, loadingArtworks, open, toast, people } = useStore()
   const { user } = useAuth()
   const nav = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -248,7 +248,7 @@ export default function AllArtwork() {
             {loadingArtworks && [0, 1, 2, 3, 4].map((i) => <div key={i} className="trow" style={{ gridTemplateColumns: '1fr' }}><Skeleton h={18} /></div>)}
             {pageRows.map((a) => {
               const step = currentStep(a)
-              const team = a.status === 'correction' ? 'Design Team' : a.status === 'approved' ? 'Completed' : step ? ROLE_TEAM[step.role] : '—'
+              const team = a.status === 'correction' ? 'Design Team' : a.status === 'approved' ? 'Completed' : step ? stepWho(step, people) : '—'
               return (
                 <div key={a.id} className="trow clickable" style={{ gridTemplateColumns: GRID }} onClick={() => nav(`/artworks/${a.id}`)}>
                   <label style={{ display: 'flex' }} onClick={(e) => e.stopPropagation()}>

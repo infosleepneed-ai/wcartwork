@@ -101,6 +101,21 @@ export function dueInfo(a) {
   return { label: `Due ${fmtDate(a.due_date)}`, tone: 'grey' }
 }
 
+export function stepWho(step, people = []) {
+  if (!step) return '—'
+  const names = (step.assignee_ids || []).map((id) => people.find((p) => p.id === id)?.full_name).filter(Boolean)
+  const team = step.role ? ROLE_TEAM[step.role] : null
+  if (team && names.length) return `${team} + ${names.length === 1 ? names[0] : `${names.length} people`}`
+  if (team) return team
+  if (names.length) return names.length <= 2 ? names.join(', ') : `${names[0]} + ${names.length - 1} more`
+  return 'Assigned people'
+}
+
+export function canSignStep(step, profile) {
+  if (!step || !profile) return false
+  return profile.role === 'admin' || (step.role && step.role === profile.role) || (step.assignee_ids || []).includes(profile.id)
+}
+
 export function currentStep(a) {
   return (a?.steps || []).find((s) => s.state === 'current') || null
 }

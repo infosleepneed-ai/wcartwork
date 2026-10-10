@@ -51,8 +51,8 @@ export default function Login() {
 
   const heading = { signin: 'Welcome back', signup: 'Create your account', reset: 'Reset your password' }[mode]
   const sub = {
-    signin: 'Sign in to continue to WC Artwork Hub.',
-    signup: 'Use your West-Coast email. An admin assigns your role after you join.',
+    signin: 'Sign in to continue to Artwork Hub.',
+    signup: 'Use your work email. An admin assigns your role after you join.',
     reset: 'Enter your work email and we’ll send a reset link.'
   }[mode]
 
@@ -60,10 +60,10 @@ export default function Login() {
     <div className="login">
       <section className="login-brand">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className="brand-mark" style={{ width: 40, height: 40, background: 'var(--accent)' }}>WC</span>
+          <span className="brand-mark" style={{ width: 40, height: 40, background: 'var(--accent)' }}>AH</span>
           <span style={{ display: 'flex', flexDirection: 'column' }}>
-            <b style={{ fontSize: 16 }}>WC Artwork Hub</b>
-            <span style={{ fontSize: 12, color: '#B9BDE6' }}>West-Coast Pharmaceutical Works Ltd.</span>
+            <b style={{ fontSize: 16 }}>Artwork Hub</b>
+            <span style={{ fontSize: 12, color: '#B9BDE6' }}>Artwork review &amp; approval</span>
           </span>
         </div>
         <div>
@@ -89,7 +89,10 @@ export default function Login() {
 
       <main className="login-form">
         <div className="login-inner">
-          <img src="/wc-logo.png" alt="West-Coast Pharmaceutical Works Ltd." style={{ width: 210, height: 'auto' }} />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="brand-mark" style={{ width: 44, height: 44, fontSize: 15 }}>AH</span>
+            <b style={{ fontSize: 20, letterSpacing: '-0.01em' }}>Artwork Hub</b>
+          </span>
           <div>
             <h2 style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em' }}>{heading}</h2>
             <p className="muted" style={{ fontSize: 15, marginTop: 8 }}>{sub}</p>
@@ -145,7 +148,7 @@ export default function Login() {
           </form>
 
           <p className="muted" style={{ fontSize: 14, textAlign: 'center' }}>
-            {mode === 'signin' ? <>New to WC Artwork Hub? <button className="link-btn" onClick={() => { setMode('signup'); setMsg(null) }}>Create an account</button></>
+            {mode === 'signin' ? <>New to Artwork Hub? <button className="link-btn" onClick={() => { setMode('signup'); setMsg(null) }}>Create an account</button></>
               : <>Already have an account? <button className="link-btn" onClick={() => { setMode('signin'); setMsg(null) }}>Sign in</button></>}
           </p>
 

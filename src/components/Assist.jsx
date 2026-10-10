@@ -36,7 +36,7 @@ function interpret(text, { artworks, countries }) {
 
   const wantsOpen = /^open\b/.test(t.trim()) && list.length > 0
   let reply
-  if (/dossier/.test(t)) reply = 'Dossiers are not live in WC Artwork Hub yet, so I searched artwork instead. '
+  if (/dossier/.test(t)) reply = 'Dossiers are not live in Artwork Hub yet, so I searched artwork instead. '
   else reply = ''
   if (!said.length) reply += list.length ? `Here are the most recently updated artworks.` : `I couldn't find any artwork yet.`
   else reply += list.length ? `Found ${list.length} artwork${list.length === 1 ? '' : 's'} matching ${said.join(', ')}.` : `No artwork matches ${said.join(', ')}.`
@@ -64,14 +64,14 @@ export default function Assist() {
   return (
     <>
       {open && (
-        <div className="assist" role="dialog" aria-label="WC Assist">
+        <div className="assist" role="dialog" aria-label="Hub Assist">
           <div className="assist-head">
             <span style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Sparkles size={17} /></span>
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <b style={{ fontSize: 15 }}>WC Assist</b>
+              <b style={{ fontSize: 15 }}>Hub Assist</b>
               <span style={{ fontSize: 12, color: '#C9CCEE' }}>Finds artwork by product, country, status or deadline</span>
             </span>
-            <button className="icon-btn sm" style={{ color: '#fff' }} onClick={() => setOpen(false)} aria-label="Close WC Assist"><X size={17} /></button>
+            <button className="icon-btn sm" style={{ color: '#fff' }} onClick={() => setOpen(false)} aria-label="Close Hub Assist"><X size={17} /></button>
           </div>
           <div className="assist-body" ref={bodyRef}>
             {log.length === 0 && (
@@ -100,14 +100,14 @@ export default function Assist() {
           </div>
           <form style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}
             onSubmit={(e) => { e.preventDefault(); ask(q) }}>
-            <label htmlFor="assist-q" className="sr-only">Ask WC Assist</label>
+            <label htmlFor="assist-q" className="sr-only">Ask Hub Assist</label>
             <input id="assist-q" className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask anything…" style={{ height: 42 }} />
             <button className="btn btn-primary" style={{ width: 42, padding: 0 }} aria-label="Send"><ArrowRight size={17} /></button>
           </form>
         </div>
       )}
-      <button className="assist-fab" onClick={() => setOpen((v) => !v)} aria-label="Open WC Assist">
-        <Sparkles size={19} color="#5CC2F2" />WC Assist
+      <button className="assist-fab" onClick={() => setOpen((v) => !v)} aria-label="Open Hub Assist">
+        <Sparkles size={19} color="#5CC2F2" />Hub Assist
       </button>
     </>
   )

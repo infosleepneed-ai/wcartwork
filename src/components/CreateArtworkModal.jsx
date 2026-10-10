@@ -13,7 +13,7 @@ const STEPS = ['Product', 'Market', 'Artwork', 'Batch & notes', 'Files', 'Review
 const EMPTY = {
   product_id: '', brand_name: '', mfg_site: '', license_code: '',
   country_code: '', customer_id: '', registration_no: '', marketing_person: '', language: 'English',
-  types: [], version_no: '1.0', packaging_type: '', packing_style: '', change_type: '', effective_date: '', priority: 'normal', due_date: '',
+  types: [], workflow_id: '', version_no: '1.0', packaging_type: '', packing_style: '', change_type: '', effective_date: '', priority: 'normal', due_date: '',
   mfg_date: '', exp_date: '', batch_no: '', notes: '', regulatory_comments: ''
 }
 const LOOKUP_KINDS = ['packaging_type', 'packing_style', 'change_type', 'mfg_site', 'license_code', 'marketing_person', 'brand_name']
@@ -34,7 +34,7 @@ function Combo({ id, label, required, value, onChange, options, placeholder }) {
 
 export default function CreateArtworkModal() {
   const { ui, close, open, products, countries, customers, toast, reload } = useStore()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const nav = useNavigate()
   const key = `wc-draft2-${user?.id}`
   const [step, setStep] = useState(0)
@@ -49,6 +49,7 @@ export default function CreateArtworkModal() {
   const [busy, setBusy] = useState(false)
   const [lookups, setLookups] = useState({})
   const [people, setPeople] = useState([])
+  const [workflows, setWorkflows] = useState([])
   const loaded = useRef(false)
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export default function CreateArtworkModal() {
       const m = {}; (data || []).forEach((r) => { (m[r.kind] = m[r.kind] || []).push(r.value) }); setLookups(m)
     })
     api.listProfiles().then((p) => setPeople(p.map((x) => x.full_name).filter(Boolean))).catch(() => {})
+    api.listWorkflows().then((ws) => setWorkflows(ws)).catch(() => setWorkflows([]))
   }, [ui.create, key])
 
   useEffect(() => {
@@ -82,6 +84,8 @@ export default function CreateArtworkModal() {
     return () => clearInterval(i)
   }, [ui.create])
 
+  const usable = workflows.filter((w) => w.active && (profile?.role === 'admin' || !w.allowed_roles?.length || w.allowed_roles.includes(profile?.role)))
+  const workflow = usable.find((w) => w.id === f.workflow_id) || usable.find((w) => w.is_default) || usable[0]
   const product = products.find((p) => p.id === f.product_id)
   const country = countries.find((c) => c.code === f.country_code)
   const customer = customers.find((c) => c.id === f.customer_id)
@@ -130,6 +134,7 @@ export default function CreateArtworkModal() {
         registration_no: f.registration_no.trim() || null, marketing_person: f.marketing_person.trim() || null, language: f.language,
         packaging_type: f.packaging_type.trim() || null, packing_style: f.packing_style.trim() || null, pack_size: f.packing_style.trim() || null,
         change_type: f.change_type.trim() || null, effective_date: f.effective_date || null, priority: f.priority, due_date: f.due_date || null,
+        workflow_id: workflow?.id || null,
         mfg_date: f.mfg_date || null, exp_date: f.exp_date || null, batch_no: f.batch_no.trim() || null,
         notes: f.notes.trim() || null, regulatory_comments: f.regulatory_comments.trim() || null
       }
@@ -295,6 +300,15 @@ export default function CreateArtworkModal() {
               </div>
               {pm && <span className="hint">{pm}</span>}
             </div>
+            {usable.length > 0 && (
+              <div className="field">
+                <label htmlFor="c-wf">Approval workflow</label>
+                <select id="c-wf" className="select" value={workflow?.id || ''} onChange={set('workflow_id')}>
+                  {usable.map((w) => <option key={w.id} value={w.id}>{w.name}{w.is_default ? ' (default)' : ''}</option>)}
+                </select>
+                {workflow && <span className="hint">Artwork Created → {workflow.steps.map((st) => st.name).join(' → ')}</span>}
+              </div>
+            )}
             <div className="grid-2">
               <div className="field">
                 <label htmlFor="c-ver">Version no.<Req /></label>
@@ -376,7 +390,7 @@ export default function CreateArtworkModal() {
             {[
               ['Product', productName(product)], ['Brand name', f.brand_name], ['Mfg site', f.mfg_site], ['License code', f.license_code || '—'],
               ['Country', country?.name], ['Buyer', customer?.name], ['Marketing person', f.marketing_person], ['Registration no.', f.registration_no || '—'],
-              ['Artwork types', f.types.join(', ')], ['Version', `V${f.version_no.replace(/^v/i, '')}`], ['Type of change', f.change_type],
+              ['Artwork types', f.types.join(', ')], ['Workflow', workflow?.name || 'Standard'], ['Version', `V${f.version_no.replace(/^v/i, '')}`], ['Type of change', f.change_type],
               ['Packaging', [f.packaging_type, f.packing_style].filter(Boolean).join(' · ') || '—'], ['Effective date', f.effective_date || '—'],
               ['Mfg / Exp', [f.mfg_date, f.exp_date].filter(Boolean).join(' → ') || '—'], ['Batch no.', f.batch_no || '—'],
               ['Files', `${Object.keys(typeFiles).length} artwork · ${refs.length} other`]

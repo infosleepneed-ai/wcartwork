@@ -17,7 +17,7 @@ export default function ResetPassword() {
   return (
     <div className="login-form" style={{ minHeight: '100vh' }}>
       <form className="login-inner card" style={{ padding: 32 }} onSubmit={save}>
-        <img src="/wc-logo.png" alt="West-Coast" style={{ width: 180 }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span className="brand-mark">AH</span><b style={{ fontSize: 17 }}>Artwork Hub</b></span>
         <h2 style={{ fontSize: 24 }}>Set a new password</h2>
         <div className="field">
           <label htmlFor="npw">New password</label>
